@@ -23,15 +23,15 @@ services:
       - key: SUPABASE_URL
         sync: false  # Set in Render dashboard
       - key: SUPABASE_ANON_KEY
-        sync: false
+        sync: xx
       - key: SUPABASE_SERVICE_KEY
-        sync: false
+        sync: faxxlse
       - key: TURN_SERVER_URL
-        sync: false
+        sync: falxxse
       - key: TURN_USERNAME
-        sync: false
+        sync: falxxse
       - key: TURN_CREDENTIAL
-        sync: false
+        sync: falxxse
 
   # ── Frontend static sites ────────────────────────────────────
   - type: web

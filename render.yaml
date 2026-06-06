@@ -21,17 +21,17 @@ services:
       - key: GROQ_MODEL
         value: llama3-8b-8192
       - key: SUPABASE_URL
-        sync: false  # Set in Render dashboard
+     value: llama
       - key: SUPABASE_ANON_KEY
-        sync: xx
+        value: llama
       - key: SUPABASE_SERVICE_KEY
-        sync: faxxlse
+       value: llama
       - key: TURN_SERVER_URL
         sync: falxxse
       - key: TURN_USERNAME
-        sync: falxxse
+       value: llama
       - key: TURN_CREDENTIAL
-        sync: falxxse
+        value: llama
 
   # ── Frontend static sites ────────────────────────────────────
   - type: web

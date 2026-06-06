@@ -27,11 +27,11 @@ services:
       - key: SUPABASE_SERVICE_KEY
         sync: false
       - key: TURN_SERVER_URL
-        value: turn:openrelay.metered.ca:80
+        sync: false
       - key: TURN_USERNAME
-        value: openrelayproject
+        sync: false
       - key: TURN_CREDENTIAL
-        value: openrelayproject
+        sync: false
 
   # ── Frontend static sites ────────────────────────────────────
   - type: web

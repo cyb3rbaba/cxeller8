@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -58,10 +59,11 @@ app.use('/api/agents', agentRoutes);
 app.use('/api/supervisor', supervisorRoutes);
 app.use('/api/documents', documentsRoutes);
 
-// Health check
-app.get('/', (req, res) => {
-  res.json({ status: 'Nexus Call Center API', version: '1.0.0', health: '/health' });
-});
+// ── Serve frontend pages ─────────────────────────────────────────────────────
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../frontend/customer/index.html')));
+app.get('/customer', (req, res) => res.sendFile(path.join(__dirname, '../frontend/customer/index.html')));
+app.get('/agent', (req, res) => res.sendFile(path.join(__dirname, '../frontend/agent/index.html')));
+app.get('/supervisor', (req, res) => res.sendFile(path.join(__dirname, '../frontend/supervisor/index.html')));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });

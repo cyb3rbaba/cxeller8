@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Support — Customer Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+<style>
+  :root {
+    --ink: #0a0a0f;
+    --paper: #f5f4f0;
+    --cream: #fffdf6;
+    --accent: #ff4d1c;
+    --accent2: #1c4dff;
+    --mid: #6b6b7b;
+    --border: rgba(10,10,15,0.1);
+    --chat-w: 420px;
+    --radius: 16px;
+    --shadow: 0 8px 40px rgba(0,0,0,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr var(--chat-w);
+    gap: 0;
+    position: relative;
+  }
+
+  .hero-left {
+    padding: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 20% 80%, rgba(255,77,28,0.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(28,77,255,0.15) 0%, transparent 50%);
+  }
+
+  .hero-left > * { position: relative; z-index: 1; }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+    margin-bottom: 80px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .hero-tag {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 20px;
+  }
+
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+  }
+
+  .hero-title .accent { color: var(--accent); }
+
+  .hero-desc {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.65);
+    max-width: 420px;
+    margin-bottom: 48px;
+  }
+
+  .feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.75);
+  }
+
+  .feature-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  /* ── Chat Panel ── */
+  .chat-panel {
+    background: var(--cream);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    position: relative;
+  }
+
+  .chat-header {
+    padding: 28px 28px 20px;
+    border-bottom: 1px solid var(--border);
+    background: white;
+  }
+
+  .chat-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .agent-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .agent-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    color: white;
+    font-weight: 700;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .agent-info h3 { font-size: 0.9rem; font-weight: 600; }
+  .agent-info p { font-size: 0.75rem; color: var(--mid); }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: #f0fdf4;
+    color: #16a34a;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .status-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .chat-mode-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--mid);
+    transition: all 0.2s;
+  }
+
+  .tab-btn.active {
+    background: var(--ink);
+    color: white;
+  }
+
+  /* ── Messages ── */
+  .messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .messages-area::-webkit-scrollbar { width: 4px; }
+  .messages-area::-webkit-scrollbar-track { background: transparent; }
+  .messages-area::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 82%;
+    animation: msgIn 0.25s ease-out;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .msg.bot, .msg.agent { align-self: flex-start; }
+  .msg.user { align-self: flex-end; }
+
+  .msg-sender {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mid);
+    margin-bottom: 5px;
+    padding: 0 4px;
+  }
+
+  .msg.user .msg-sender { text-align: right; }
+
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+
+  .msg.bot .msg-bubble {
+    background: white;
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg.agent .msg-bubble {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg.user .msg-bubble {
+    background: var(--ink);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-time {
+    font-size: 0.65rem;
+    color: var(--mid);
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+
+  .msg.user .msg-time { text-align: right; }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+    align-self: flex-start;
+  }
+
+  .typing-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--mid);
+    animation: typingBounce 1.2s infinite ease-in-out;
+  }
+
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typingBounce {
+    0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Escalation card */
+  .escalation-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    align-self: flex-start;
+    max-width: 85%;
+    animation: msgIn 0.25s ease-out;
+  }
+
+  .escalation-card p { font-size: 0.85rem; color: var(--mid); margin-bottom: 14px; line-height: 1.5; }
+
+  .escalation-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .esc-btn {
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .esc-btn.chat {
+    background: var(--ink);
+    color: white;
+  }
+
+  .esc-btn.chat:hover { background: #1a1a2e; }
+
+  .esc-btn.voice {
+    background: transparent;
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+
+  .esc-btn.voice:hover { background: var(--ink); color: white; }
+
+  /* ── Input area ── */
+  .input-area {
+    padding: 16px 20px;
+    background: white;
+    border-top: 1px solid var(--border);
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .msg-input {
+    flex: 1;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    resize: none;
+    outline: none;
+    background: var(--paper);
+    transition: border-color 0.2s;
+    min-height: 46px;
+    max-height: 120px;
+    line-height: 1.5;
+  }
+
+  .msg-input:focus { border-color: var(--accent2); }
+
+  .send-btn {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    border: none;
+    background: var(--ink);
+    color: white;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .send-btn:hover { background: var(--accent); transform: scale(1.05); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .input-hint { font-size: 0.7rem; color: var(--mid); text-align: center; margin-top: 8px; }
+
+  /* ── Voice Call UI ── */
+  #voice-section {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 40px;
+    gap: 24px;
+    background: var(--cream);
+  }
+
+  .call-status-display {
+    text-align: center;
+  }
+
+  .call-avatar-ring {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    margin: 0 auto 20px;
+    box-shadow: 0 0 0 0 rgba(255,77,28,0.4);
+    animation: ring 2s infinite;
+  }
+
+  @keyframes ring {
+    0% { box-shadow: 0 0 0 0 rgba(255,77,28,0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(255,77,28,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,77,28,0); }
+  }
+
+  .call-status-display h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+  }
+
+  .call-status-display p { color: var(--mid); font-size: 0.9rem; }
+
+  #call-timer {
+    font-family: 'Syne', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+  }
+
+  .call-controls {
+    display: flex;
+    gap: 16px;
+  }
+
+  .call-btn {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 1.4rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .call-btn:hover { transform: scale(1.1); }
+
+  .call-btn.mute { background: rgba(0,0,0,0.08); color: var(--ink); }
+  .call-btn.mute.active { background: var(--ink); color: white; }
+  .call-btn.end { background: #ef4444; color: white; }
+  .call-btn.request-call { background: #22c55e; color: white; width: auto; border-radius: 28px; padding: 0 28px; gap: 8px; font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 700; height: 52px; }
+
+  /* Queue info */
+  .queue-info {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--mid);
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .queue-info strong { display: block; font-family: 'Syne', sans-serif; font-size: 1.5rem; color: var(--ink); margin-bottom: 2px; }
+
+  /* Customer name modal */
+  .name-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .name-modal-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    width: 380px;
+    max-width: 90vw;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+
+  .name-modal-card h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+  }
+
+  .name-modal-card p { color: var(--mid); font-size: 0.9rem; margin-bottom: 28px; }
+
+  .name-input {
+    width: 100%;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-family: inherit;
+    font-size: 1rem;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+
+  .name-input:focus { border-color: var(--accent2); }
+
+  .start-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--ink);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .start-btn:hover { background: var(--accent); }
+
+  audio { display: none; }
+
+  /* Live chat section */
+  #live-chat-section { display: none; }
+  #live-chat-section.active { display: flex; flex-direction: column; flex: 1; }
+
+  .live-chat-banner {
+    background: #eff6ff;
+    border-bottom: 1px solid #bfdbfe;
+    padding: 10px 20px;
+    font-size: 0.8rem;
+    color: #1d4ed8;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .hero-left { padding: 40px 24px; min-height: 40vh; }
+    .hero-title { font-size: 2rem; }
+    .chat-panel { min-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Name Modal -->
+<div class="name-modal" id="name-modal">
+  <div class="name-modal-card">
+    <div style="font-size:2rem;margin-bottom:16px">👋</div>
+    <h2>Welcome to Support</h2>
+    <p>Tell us your name so our assistant can greet you properly.</p>
+    <input class="name-input" id="customer-name-input" placeholder="Your name" autofocus>
+    <button class="start-btn" id="start-btn">Start Conversation</button>
+  </div>
+</div>
+
+<div class="hero">
+  <!-- Left side -->
+  <div class="hero-left">
+    <div class="logo"><span class="logo-dot"></span> Nexus Support</div>
+    <div class="hero-tag">24 / 7 Customer Excellence</div>
+    <h1 class="hero-title">We're here<br>when you<br>need <span class="accent">help.</span></h1>
+    <p class="hero-desc">AI-powered support that actually understands your questions — and real humans when you need them most.</p>
+    <div class="feature-list">
+      <div class="feature-item"><div class="feature-icon">🤖</div> Instant AI answers from our knowledge base</div>
+      <div class="feature-item"><div class="feature-icon">💬</div> Live chat with trained support agents</div>
+      <div class="feature-item"><div class="feature-icon">📞</div> HD voice calls via secure WebRTC</div>
+      <div class="feature-item"><div class="feature-icon">🔒</div> End-to-end encrypted communications</div>
+    </div>
+  </div>
+
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-header-top">
+        <div class="agent-badge">
+          <div class="agent-avatar">N</div>
+          <div class="agent-info">
+            <h3>Nexus Assistant</h3>
+            <p id="header-status">AI-powered support</p>
+          </div>
+        </div>
+        <div class="status-pill"><span class="dot"></span> Online</div>
+      </div>
+      <div class="chat-mode-tabs">
+        <button class="tab-btn active" id="tab-bot" onclick="switchTab('bot')">🤖 AI Chat</button>
+        <button class="tab-btn" id="tab-live" onclick="switchTab('live')">💬 Live Chat</button>
+        <button class="tab-btn" id="tab-voice" onclick="switchTab('voice')">📞 Voice Call</button>
+      </div>
+    </div>
+
+    <!-- Bot Chat -->
+    <div id="bot-section" style="display:flex;flex-direction:column;flex:1">
+      <div class="messages-area" id="messages-area"></div>
+      <div class="input-area">
+        <div class="input-row">
+          <textarea class="msg-input" id="msg-input" placeholder="Ask me anything…" rows="1"></textarea>
+          <button class="send-btn" id="send-btn" onclick="sendMessage()">↑</button>
+        </div>
+        <div class="input-hint">Press Enter to send · Shift+Enter for new line</div>
+      </div>
+    </div>
+
+    <!-- Live Chat -->
+    <div id="live-chat-section">
+      <div class="live-chat-banner" id="live-chat-banner">🔄 Connecting to an agent…</div>
+      <div class="messages-area" id="live-messages-area"></div>
+      <div class="input-area">
+        <div class="input-row">
+          <textarea class="msg-input" id="live-msg-input" placeholder="Message your agent…" rows="1"></textarea>
+          <button class="send-btn" onclick="sendLiveMessage()">↑</button>
+        </div>
+        <div id="live-end-row" style="margin-top:10px;display:none">
+          <button onclick="endLiveChat()" style="width:100%;padding:10px;background:#fee2e2;color:#dc2626;border:none;border-radius:10px;font-family:inherit;font-weight:600;font-size:0.85rem;cursor:pointer;">
+            End Chat Session
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice Call -->
+    <div id="voice-section">
+      <div class="call-status-display">
+        <div class="call-avatar-ring" id="call-ring-avatar">📞</div>
+        <h3 id="call-status-text">Ready to call</h3>
+        <p id="call-sub-text">Connect with a live agent via voice</p>
+      </div>
+
+      <div id="call-timer-display" style="display:none">
+        <div id="call-timer">00:00</div>
+      </div>
+
+      <div class="queue-info" id="queue-info" style="display:none">
+        <strong id="queue-pos">—</strong>
+        Position in queue
+      </div>
+
+      <div class="call-controls" id="call-controls">
+        <button class="call-btn request-call" id="request-call-btn" onclick="requestVoiceCall()">
+          📞 Request Call
+        </button>
+      </div>
+
+      <div class="call-controls" id="active-call-controls" style="display:none">
+        <button class="call-btn mute" id="mute-btn" onclick="toggleMute()" title="Mute">🎙️</button>
+        <button class="call-btn end" onclick="endCall()" title="End call">📵</button>
+      </div>
+    </div>
+
+    <audio id="remote-audio" autoplay playsinline></audio>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const API_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:3001'
+  : 'https://your-render-app.onrender.com'; // Update for production
+
+let socket, customerName = '', sessionId = null;
+let currentTab = 'bot';
+let conversationHistory = [];
+let isBotTyping = false;
+
+// Live chat state
+let liveChatSessionId = null;
+
+// WebRTC state
+let peerConnection = null;
+let localStream = null;
+let callId = null;
+let callTimerInterval = null;
+let callSeconds = 0;
+let isMuted = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', startSession);
+document.getElementById('customer-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startSession();
+});
+
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+document.getElementById('live-msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendLiveMessage(); }
+});
+
+function startSession() {
+  const nameInput = document.getElementById('customer-name-input');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.style.borderColor = '#ef4444'; return; }
+
+  customerName = name;
+  document.getElementById('name-modal').style.display = 'none';
+
+  // Connect socket
+  socket = io(API_URL, { transports: ['websocket', 'polling'] });
+  socket.on('connect', () => {
+    socket.emit('register:customer', { name: customerName });
+  });
+
+  socket.on('registered', (data) => {
+    sessionId = data.sessionId;
+  });
+
+  // Chat events
+  socket.on('chat:queued', ({ position }) => {
+    appendMsg('system', `You're #${position} in queue. An agent will join shortly…`, 'bot');
+    document.getElementById('live-chat-banner').textContent = `⏳ Queue position: ${position}`;
+  });
+
+  socket.on('chat:connected', ({ agentName }) => {
+    document.getElementById('live-chat-banner').textContent = `✅ Connected with ${agentName}`;
+    document.getElementById('live-chat-banner').style.background = '#f0fdf4';
+    document.getElementById('live-chat-banner').style.borderColor = '#bbf7d0';
+    document.getElementById('live-chat-banner').style.color = '#16a34a';
+    document.getElementById('live-end-row').style.display = 'block';
+    appendLiveMsg('system', `Agent ${agentName} has joined`, '');
+  });
+
+  socket.on('chat:message', (msg) => {
+    if (msg.sender === 'agent') appendLiveMsg('agent', msg.text, msg.sender);
+  });
+
+  socket.on('chat:ended', () => {
+    appendLiveMsg('system', 'Chat session ended', '');
+    document.getElementById('live-end-row').style.display = 'none';
+    document.getElementById('live-chat-banner').textContent = '❌ Chat ended';
+  });
+
+  // Voice call events
+  socket.on('call:queued', ({ callId: cId, position }) => {
+    callId = cId;
+    document.getElementById('call-status-text').textContent = `Waiting for agent…`;
+    document.getElementById('call-sub-text').textContent = `Queue position: ${position}`;
+    document.getElementById('queue-info').style.display = 'block';
+    document.getElementById('queue-pos').textContent = position;
+  });
+
+  socket.on('call:accepted', async ({ callId: cId, agentName }) => {
+    document.getElementById('call-status-text').textContent = `Connecting with ${agentName}…`;
+    document.getElementById('queue-info').style.display = 'none';
+    await initiatePeerConnection();
+  });
+
+  socket.on('call:initiate', ({ customerSocketId }) => {
+    // This fires on agent side; customer waits for offer
+  });
+
+  socket.on('webrtc:offer', async ({ callId: cId, offer, fromSocketId }) => {
+    if (!peerConnection) await initiatePeerConnection();
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit('webrtc:answer', { callId: cId, answer, targetSocketId: fromSocketId });
+  });
+
+  socket.on('webrtc:answer', async ({ answer }) => {
+    if (peerConnection) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+  });
+
+  socket.on('webrtc:ice-candidate', async ({ candidate }) => {
+    if (peerConnection && candidate) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  });
+
+  socket.on('call:active', () => {
+    startCallTimer();
+    document.getElementById('call-status-text').textContent = 'In Call';
+    document.getElementById('call-controls').style.display = 'none';
+    document.getElementById('active-call-controls').style.display = 'flex';
+    document.getElementById('call-timer-display').style.display = 'block';
+    document.getElementById('call-ring-avatar').textContent = '🎙️';
+    document.getElementById('call-ring-avatar').style.animation = 'none';
+  });
+
+  socket.on('call:ended', ({ callId: cId }) => {
+    cleanupCall();
+    document.getElementById('call-status-text').textContent = 'Call Ended';
+    document.getElementById('call-sub-text').textContent = 'Thank you for calling!';
+    document.getElementById('active-call-controls').style.display = 'none';
+    document.getElementById('call-controls').style.display = 'flex';
+    document.getElementById('call-timer-display').style.display = 'none';
+  });
+
+  socket.on('call:rejected', () => {
+    document.getElementById('call-status-text').textContent = 'No agents available';
+    document.getElementById('call-sub-text').textContent = 'Please try again or use live chat';
+    document.getElementById('call-controls').style.display = 'flex';
+    document.getElementById('request-call-btn').disabled = false;
+  });
+
+  // Initial bot greeting
+  appendMsg('bot', `Hi ${customerName}! 👋 I'm Nexus AI, your support assistant. How can I help you today?`, 'bot');
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  ['bot', 'live', 'voice'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+
+  document.getElementById('bot-section').style.display = tab === 'bot' ? 'flex' : 'none';
+  document.getElementById('live-chat-section').style.display = tab === 'live' ? 'flex' : 'none';
+  document.getElementById('voice-section').style.display = tab === 'voice' ? 'flex' : 'none';
+
+  if (tab === 'live') document.getElementById('live-chat-section').classList.add('active');
+}
+
+// ── Bot Chat ──────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const message = input.value.trim();
+  if (!message || isBotTyping) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  appendMsg('user', message, 'user');
+  conversationHistory.push({ role: 'user', content: message });
+
+  showTyping();
+  isBotTyping = true;
+  document.getElementById('send-btn').disabled = true;
+
+  try {
+    const res = await fetch(`${API_URL}/api/chat/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: conversationHistory }),
+    });
+
+    const data = await res.json();
+    hideTyping();
+    isBotTyping = false;
+    document.getElementById('send-btn').disabled = false;
+
+    conversationHistory.push({ role: 'assistant', content: data.message });
+    appendMsg('bot', data.message, 'bot');
+
+    if (data.escalate) {
+      showEscalationOptions();
+    }
+  } catch (err) {
+    hideTyping();
+    isBotTyping = false;
+    document.getElementById('send-btn').disabled = false;
+    appendMsg('bot', "I'm having connectivity issues. Please try again or contact an agent.", 'bot');
+  }
+}
+
+function appendMsg(sender, text, type) {
+  const area = document.getElementById('messages-area');
+  const div = document.createElement('div');
+  div.className = `msg ${type}`;
+
+  const senderLabel = type === 'bot' ? 'AI Assistant' : type === 'agent' ? 'Agent' : type === 'user' ? customerName || 'You' : '';
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  div.innerHTML = `
+    ${senderLabel ? `<div class="msg-sender">${senderLabel}</div>` : ''}
+    <div class="msg-bubble">${text.replace(/\n/g, '<br>')}</div>
+    <div class="msg-time">${time}</div>
+  `;
+
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function showEscalationOptions() {
+  const area = document.getElementById('messages-area');
+  const div = document.createElement('div');
+  div.className = 'escalation-card';
+  div.innerHTML = `
+    <p>I'd recommend connecting you with a live agent who can provide personalized assistance.</p>
+    <div class="escalation-btns">
+      <button class="esc-btn chat" onclick="escalateToChat()">💬 Live Chat</button>
+      <button class="esc-btn voice" onclick="escalateToVoice()">📞 Voice Call</button>
+    </div>
+  `;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+let typingEl = null;
+function showTyping() {
+  const area = document.getElementById('messages-area');
+  typingEl = document.createElement('div');
+  typingEl.id = 'typing-indicator';
+  typingEl.innerHTML = `<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+  area.appendChild(typingEl);
+  area.scrollTop = area.scrollHeight;
+}
+
+function hideTyping() {
+  if (typingEl) { typingEl.remove(); typingEl = null; }
+}
+
+// ── Live Chat ─────────────────────────────────────────────────────────────────
+function escalateToChat() {
+  switchTab('live');
+  if (!socket) return;
+  socket.emit('chat:request', {});
+}
+
+function appendLiveMsg(senderType, text, sender) {
+  const area = document.getElementById('live-messages-area');
+  const div = document.createElement('div');
+  div.className = `msg ${senderType === 'agent' ? 'agent' : senderType === 'user' ? 'user' : 'bot'}`;
+
+  const label = senderType === 'agent' ? 'Agent' : senderType === 'user' ? customerName : '';
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  div.innerHTML = `
+    ${label ? `<div class="msg-sender">${label}</div>` : ''}
+    <div class="msg-bubble" style="${senderType === 'system' ? 'background:transparent;border:none;color:#6b6b7b;font-style:italic;font-size:0.8rem;text-align:center;' : ''}">${text}</div>
+    ${label ? `<div class="msg-time">${time}</div>` : ''}
+  `;
+
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function sendLiveMessage() {
+  const input = document.getElementById('live-msg-input');
+  const message = input.value.trim();
+  if (!message || !liveChatSessionId) return;
+  input.value = '';
+
+  socket.emit('chat:message', { sessionId: liveChatSessionId, message, sender: 'customer' });
+  appendLiveMsg('user', message, 'user');
+}
+
+function endLiveChat() {
+  if (liveChatSessionId) socket.emit('chat:end', { sessionId: liveChatSessionId });
+}
+
+socket && socket.on('chat:connected', ({ sessionId: sid }) => { liveChatSessionId = sid; });
+
+// ── Voice Call ────────────────────────────────────────────────────────────────
+function escalateToVoice() { switchTab('voice'); }
+
+async function requestVoiceCall() {
+  if (!socket) { alert('Please wait for connection…'); return; }
+
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (err) {
+    alert('Microphone access required for voice calls. Please allow microphone access.');
+    return;
+  }
+
+  document.getElementById('request-call-btn').disabled = true;
+  document.getElementById('call-status-text').textContent = 'Requesting call…';
+  socket.emit('call:request', {});
+}
+
+async function initiatePeerConnection() {
+  const iceRes = await fetch(`${API_URL}/api/ice-servers`);
+  const { iceServers } = await iceRes.json();
+
+  peerConnection = new RTCPeerConnection({ iceServers });
+
+  // Add local audio
+  if (localStream) {
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+  }
+
+  // Receive remote audio
+  peerConnection.ontrack = (event) => {
+    const audio = document.getElementById('remote-audio');
+    audio.srcObject = event.streams[0];
+  };
+
+  peerConnection.onicecandidate = ({ candidate }) => {
+    if (candidate && socket) {
+      socket.emit('webrtc:ice-candidate', { callId, candidate, targetSocketId: null });
+    }
+  };
+
+  peerConnection.onconnectionstatechange = () => {
+    if (peerConnection.connectionState === 'connected') {
+      socket.emit('call:active', { callId });
+    }
+  };
+
+  // Setup recording
+  try {
+    const allTracks = [...(localStream?.getTracks() || [])];
+    if (allTracks.length > 0) {
+      const recStream = new MediaStream(allTracks);
+      mediaRecorder = new MediaRecorder(recStream, { mimeType: 'audio/webm' });
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.start(1000);
+    }
+  } catch (e) {
+    console.warn('Recording setup failed:', e);
+  }
+}
+
+async function toggleMute() {
+  isMuted = !isMuted;
+  if (localStream) {
+    localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+  }
+  const btn = document.getElementById('mute-btn');
+  btn.classList.toggle('active', isMuted);
+  btn.textContent = isMuted ? '🔇' : '🎙️';
+  btn.title = isMuted ? 'Unmute' : 'Mute';
+}
+
+function endCall() {
+  socket.emit('call:end', { callId });
+  uploadRecording();
+  cleanupCall();
+}
+
+async function uploadRecording() {
+  if (!mediaRecorder || recordedChunks.length === 0 || !callId) return;
+  mediaRecorder.stop();
+  const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+  const formData = new FormData();
+  formData.append('recording', blob, `call-${callId}.webm`);
+
+  try {
+    const token = localStorage.getItem('token');
+    await fetch(`${API_URL}/api/calls/${callId}/recording`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+  } catch (e) {
+    console.warn('Recording upload failed:', e);
+  }
+}
+
+function cleanupCall() {
+  if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  callSeconds = 0;
+  recordedChunks = [];
+  mediaRecorder = null;
+}
+
+function startCallTimer() {
+  callSeconds = 0;
+  callTimerInterval = setInterval(() => {
+    callSeconds++;
+    const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+    const s = String(callSeconds % 60).padStart(2, '0');
+    document.getElementById('call-timer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+// Auto-resize textarea
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+</script>
+</body>
+</html>

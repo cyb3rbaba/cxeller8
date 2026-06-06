@@ -1,0 +1,56 @@
+services:
+  # ── Backend API + WebSocket server ──────────────────────────
+  - type: web
+    name: nexus-callcenter-backend
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://nexus-callcenter.onrender.com  # update with your URL
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false  # Set in Render dashboard
+      - key: GROQ_MODEL
+        value: llama3-8b-8192
+      - key: SUPABASE_URL
+        sync: false  # Set in Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: TURN_SERVER_URL
+        value: turn:openrelay.metered.ca:80
+      - key: TURN_USERNAME
+        value: openrelayproject
+      - key: TURN_CREDENTIAL
+        value: openrelayproject
+
+  # ── Frontend static sites ────────────────────────────────────
+  - type: web
+    name: nexus-customer
+    runtime: static
+    buildCommand: echo "No build needed"
+    staticPublishPath: frontend/customer
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: true
+
+  - type: web
+    name: nexus-agent
+    runtime: static
+    buildCommand: echo "No build needed"
+    staticPublishPath: frontend/agent
+
+  - type: web
+    name: nexus-supervisor
+    runtime: static
+    buildCommand: echo "No build needed"
+    staticPublishPath: frontend/supervisor

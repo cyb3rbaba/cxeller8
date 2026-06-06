@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus — Supervisor Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f7f4;
+    --white: #ffffff;
+    --ink: #1a1a24;
+    --mid: #6b6b80;
+    --light: #e8e7e2;
+    --accent: #5b4cf6;
+    --accent-light: rgba(91,76,246,0.1);
+    --green: #10b981;
+    --green-light: rgba(16,185,129,0.1);
+    --red: #ef4444;
+    --red-light: rgba(239,68,68,0.08);
+    --yellow: #f59e0b;
+    --yellow-light: rgba(245,158,11,0.1);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+    --radius: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ── Login ── */
+  #login-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26,26,36,0.5);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .login-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 48px;
+    width: 400px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.15);
+  }
+
+  .login-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 100px;
+    margin-bottom: 24px;
+  }
+
+  .login-card h1 { font-size: 1.7rem; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
+  .login-card p { color: var(--mid); font-size: 0.9rem; margin-bottom: 28px; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--mid); margin-bottom: 6px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .field input { width: 100%; border: 1.5px solid var(--light); border-radius: 10px; padding: 12px 14px; font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.2s; background: var(--bg); }
+  .field input:focus { border-color: var(--accent); background: white; }
+
+  .login-btn { width: 100%; padding: 13px; background: var(--accent); border: none; border-radius: 10px; color: white; font-family: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity 0.2s; }
+  .login-btn:hover { opacity: 0.85; }
+  #login-err { color: var(--red); font-size: 0.82rem; margin-top: 12px; text-align: center; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 240px;
+    background: var(--ink);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .sidebar-logo {
+    padding: 28px 24px 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .sidebar-logo span { color: #7c6ff7; }
+
+  .sidebar-section {
+    padding: 20px 12px 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    padding-left: 16px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    margin: 2px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: rgba(255,255,255,0.6);
+    transition: all 0.15s;
+  }
+
+  .nav-item:hover { background: rgba(255,255,255,0.06); color: white; }
+  .nav-item.active { background: rgba(91,76,246,0.25); color: white; }
+  .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 20px;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.3);
+  }
+
+  .live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+  }
+
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  /* Main content */
+  .main { flex: 1; padding: 32px; overflow-y: auto; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .page-title { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-sub { font-size: 0.85rem; color: var(--mid); margin-top: 3px; }
+
+  /* Stat cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .stat-card.purple::before { background: var(--accent); }
+  .stat-card.green::before { background: var(--green); }
+  .stat-card.yellow::before { background: var(--yellow); }
+  .stat-card.red::before { background: var(--red); }
+
+  .stat-icon { font-size: 1.4rem; margin-bottom: 12px; }
+  .stat-value { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; margin-bottom: 6px; }
+  .stat-label { font-size: 0.78rem; color: var(--mid); font-weight: 500; }
+  .stat-trend { font-size: 0.72rem; margin-top: 6px; font-weight: 600; }
+  .stat-trend.up { color: var(--green); }
+  .stat-trend.neutral { color: var(--mid); }
+
+  /* Tables */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .card-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-title { font-weight: 700; font-size: 0.95rem; }
+  .card-sub { font-size: 0.78rem; color: var(--mid); }
+
+  .card-btn {
+    padding: 8px 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .card-btn:hover { opacity: 0.85; }
+  .card-btn.secondary { background: var(--bg); color: var(--ink); border: 1px solid var(--light); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 12px 20px; text-align: left; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); border-bottom: 1px solid var(--light); }
+  td { padding: 14px 20px; font-size: 0.87rem; border-bottom: 1px solid var(--light); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  /* Badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .badge.green { background: var(--green-light); color: var(--green); }
+  .badge.yellow { background: var(--yellow-light); color: var(--yellow); }
+  .badge.red { background: var(--red-light); color: var(--red); }
+  .badge.purple { background: var(--accent-light); color: var(--accent); }
+  .badge.gray { background: rgba(0,0,0,0.06); color: var(--mid); }
+  .badge::before { content: '●'; font-size: 0.5rem; }
+
+  /* Queue live */
+  .queue-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--light);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .queue-item:last-child { border-bottom: none; }
+  .queue-pos { font-family: 'Space Mono', monospace; font-size: 0.8rem; font-weight: 700; width: 24px; color: var(--mid); }
+  .queue-info { flex: 1; }
+  .queue-name { font-weight: 600; font-size: 0.9rem; }
+  .queue-meta { font-size: 0.75rem; color: var(--mid); margin-top: 2px; font-family: 'Space Mono', monospace; }
+  .queue-wait { font-family: 'Space Mono', monospace; font-size: 0.8rem; color: var(--yellow); }
+
+  /* Charts */
+  .chart-container { padding: 24px; }
+
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
+  .bar { flex: 1; border-radius: 6px 6px 0 0; min-height: 4px; background: var(--accent-light); position: relative; transition: height 0.5s; cursor: pointer; }
+  .bar:hover { background: var(--accent); }
+  .bar span { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); font-size: 0.6rem; color: var(--mid); white-space: nowrap; font-family: 'Space Mono', monospace; }
+
+  /* Forms */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 0.75rem; font-weight: 600; color: var(--mid); text-transform: uppercase; letter-spacing: 0.06em; }
+  .form-group input { border: 1.5px solid var(--light); border-radius: 10px; padding: 10px 14px; font-family: inherit; font-size: 0.88rem; outline: none; background: var(--bg); transition: border-color 0.2s; }
+  .form-group input:focus { border-color: var(--accent); background: white; }
+
+  .submit-btn { padding: 11px 24px; background: var(--accent); color: white; border: none; border-radius: 10px; font-family: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s; }
+  .submit-btn:hover { opacity: 0.85; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--light);
+    border-radius: var(--radius);
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-light); }
+  .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .upload-text { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
+  .upload-sub { font-size: 0.8rem; color: var(--mid); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--ink);
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: var(--shadow);
+    z-index: 9999;
+    animation: toastIn 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  @keyframes toastIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+  .empty-state { text-align: center; padding: 48px; color: var(--mid); }
+  .empty-state .ei { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  @media (max-width: 1024px) { .two-col { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-badge">🔒 Supervisor Access</div>
+    <h1>Dashboard Login</h1>
+    <p>Sign in to access the supervisor control panel</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="sup-email" value="supervisor@callcenter.com">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="sup-password" value="super123">
+    </div>
+    <button class="login-btn" onclick="login()">Sign In as Supervisor</button>
+    <div id="login-err"></div>
+    <p style="margin-top:16px;font-size:0.75rem;color:var(--mid);text-align:center">Demo: supervisor@callcenter.com / super123</p>
+  </div>
+</div>
+
+<div class="layout" id="dashboard" style="display:none">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">NEXUS <span>//</span> SUPER</div>
+
+    <div class="sidebar-section">Overview</div>
+    <div class="nav-item active" onclick="showPage('overview', this)"><span class="nav-icon">📊</span> Overview</div>
+    <div class="nav-item" onclick="showPage('live', this)"><span class="nav-icon">📡</span> Live Monitor</div>
+
+    <div class="sidebar-section">Management</div>
+    <div class="nav-item" onclick="showPage('agents', this)"><span class="nav-icon">👥</span> Agents</div>
+    <div class="nav-item" onclick="showPage('recordings', this)"><span class="nav-icon">🎙️</span> Recordings</div>
+    <div class="nav-item" onclick="showPage('documents', this)"><span class="nav-icon">📄</span> Knowledge Base</div>
+
+    <div class="sidebar-footer">
+      <div class="live-indicator"><div class="live-dot"></div> <span id="footer-conn">Connecting…</span></div>
+      <div style="margin-top:8px;font-size:0.72rem" id="footer-user">—</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Overview -->
+    <div class="page active" id="page-overview">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Overview</div>
+          <div class="page-sub" id="overview-time">Loading…</div>
+        </div>
+        <button class="card-btn secondary" onclick="refreshStats()">↻ Refresh</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card purple"><div class="stat-icon">📞</div><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Calls</div><div class="stat-trend neutral" id="stat-today-calls">— today</div></div>
+        <div class="stat-card green"><div class="stat-icon">⏱️</div><div class="stat-value" id="stat-avg">—</div><div class="stat-label">Avg Duration</div><div class="stat-trend neutral">Per call</div></div>
+        <div class="stat-card yellow"><div class="stat-icon">🟡</div><div class="stat-value" id="stat-queue">—</div><div class="stat-label">Queue Length</div><div class="stat-trend neutral">Waiting now</div></div>
+        <div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-value" id="stat-agents-active">—</div><div class="stat-label">Active Agents</div><div class="stat-trend neutral" id="stat-agents-busy">— on call</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><div><div class="card-title">Call Volume (Today)</div><div class="card-sub">Hourly distribution</div></div></div>
+          <div class="chart-container">
+            <div class="bar-chart" id="bar-chart"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><div class="card-title">Live Queue</div><div class="card-sub" id="queue-count">0 waiting</div></div></div>
+          <div id="live-queue-overview">
+            <div class="empty-state"><div class="ei">✅</div>No customers waiting</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Monitor -->
+    <div class="page" id="page-live">
+      <div class="page-header">
+        <div><div class="page-title">Live Monitor</div><div class="page-sub">Real-time agent and call status</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Active Agents</div></div>
+        <div id="live-agents-table">
+          <div class="empty-state"><div class="ei">👤</div>No agents online</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Active Calls</div></div>
+        <div id="live-calls-table">
+          <div class="empty-state"><div class="ei">📭</div>No active calls</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agents -->
+    <div class="page" id="page-agents">
+      <div class="page-header">
+        <div><div class="page-title">Agent Management</div><div class="page-sub">Add and manage support agents</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Add New Agent</div></div>
+          <div style="padding:24px">
+            <div class="form-row">
+              <div class="form-group"><label>Full Name</label><input type="text" id="new-agent-name" placeholder="Jane Smith"></div>
+              <div class="form-group"><label>Email</label><input type="email" id="new-agent-email" placeholder="jane@company.com"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Password</label><input type="password" id="new-agent-pass" placeholder="Minimum 8 chars"></div>
+              <div class="form-group" style="justify-content:flex-end"><button class="submit-btn" onclick="addAgent()">Create Agent</button></div>
+            </div>
+            <div id="agent-form-msg" style="font-size:0.82rem;margin-top:8px"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Agent Roster</div></div>
+          <div id="agents-roster">
+            <div class="empty-state"><div class="ei">👥</div>No agents registered</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recordings -->
+    <div class="page" id="page-recordings">
+      <div class="page-header">
+        <div><div class="page-title">Call Recordings</div><div class="page-sub">Review and manage recorded calls</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Recent Recordings</div></div>
+        <div id="recordings-list">
+          <div class="empty-state"><div class="ei">🎙️</div>No recordings available yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents / Knowledge Base -->
+    <div class="page" id="page-documents">
+      <div class="page-header">
+        <div><div class="page-title">Knowledge Base</div><div class="page-sub">Manage documents for the RAG chatbot</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Upload Document</div></div>
+          <div style="padding:24px">
+            <div style="margin-bottom:16px">
+              <div class="form-group"><label>Document Title</label><input type="text" id="doc-title" placeholder="e.g. Refund Policy" style="margin-bottom:0"></div>
+            </div>
+            <div class="upload-zone" id="upload-zone" onclick="document.getElementById('doc-file-input').click()" ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave(event)">
+              <div class="upload-icon">📁</div>
+              <div class="upload-text">Click to upload or drag & drop</div>
+              <div class="upload-sub">TXT, PDF, DOCX • Max 10MB</div>
+            </div>
+            <input type="file" id="doc-file-input" accept=".txt,.pdf,.docx,.md" style="display:none" onchange="uploadDoc(this.files[0])">
+            <div id="upload-progress" style="margin-top:12px;font-size:0.82rem;color:var(--mid)"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Uploaded Documents</div><div class="card-sub" id="doc-count">0 documents</div></div>
+            <button class="card-btn secondary" onclick="loadDocuments()">↻</button>
+          </div>
+          <div id="documents-list">
+            <div class="empty-state"><div class="ei">📄</div>No documents uploaded yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:3001'
+  : 'https://your-render-app.onrender.com';
+
+let token, socket, supervisorInfo;
+let liveAgents = [], liveQueue = [], liveCalls = [];
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function login() {
+  const email = document.getElementById('sup-email').value;
+  const password = document.getElementById('sup-password').value;
+
+  try {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    if (data.user.role !== 'supervisor') throw new Error('Supervisor account required');
+
+    token = data.token;
+    supervisorInfo = data.user;
+    localStorage.setItem('token', token);
+
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    document.getElementById('footer-user').textContent = supervisorInfo.name;
+
+    initSocket();
+    refreshStats();
+    loadDocuments();
+    loadAgents();
+    startOverviewClock();
+    renderBarChart();
+  } catch (err) {
+    document.getElementById('login-err').textContent = err.message;
+  }
+}
+
+document.getElementById('sup-password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Socket ─────────────────────────────────────────────────────────────────────
+function initSocket() {
+  socket = io(API_URL, { transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    socket.emit('register:supervisor', {});
+    document.getElementById('footer-conn').textContent = 'Live';
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('footer-conn').textContent = 'Reconnecting…';
+  });
+
+  socket.on('state:snapshot', ({ agents, queue, activeCalls }) => {
+    liveAgents = agents;
+    liveQueue = queue;
+    liveCalls = activeCalls;
+    renderLiveData();
+  });
+
+  socket.on('agents:update', (agents) => {
+    liveAgents = agents;
+    renderLiveData();
+    document.getElementById('stat-agents-active').textContent = agents.length;
+    document.getElementById('stat-agents-busy').textContent = `${agents.filter(a => a.status === 'on-call' || a.status === 'busy').length} on call`;
+  });
+
+  socket.on('queue:update', (queue) => {
+    liveQueue = queue;
+    renderLiveData();
+    document.getElementById('stat-queue').textContent = queue.length;
+    document.getElementById('queue-count').textContent = `${queue.length} waiting`;
+  });
+
+  socket.on('call:updated', (call) => {
+    const idx = liveCalls.findIndex(c => c.id === call?.id);
+    if (idx > -1) liveCalls[idx] = call;
+    else if (call) liveCalls.push(call);
+    renderLiveData();
+  });
+
+  socket.on('call:ended', (call) => {
+    liveCalls = liveCalls.filter(c => c.id !== call?.id);
+    renderLiveData();
+  });
+}
+
+function renderLiveData() {
+  renderLiveAgents();
+  renderLiveCalls();
+  renderLiveQueue();
+}
+
+function renderLiveAgents() {
+  const el = document.getElementById('live-agents-table');
+  if (!liveAgents.length) {
+    el.innerHTML = '<div class="empty-state"><div class="ei">👤</div>No agents online</div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Agent</th><th>Status</th><th>Current Call</th><th>Joined</th></tr></thead>
+    <tbody>
+      ${liveAgents.map(a => `
+        <tr>
+          <td><strong>${a.name}</strong></td>
+          <td>${statusBadge(a.status)}</td>
+          <td><span style="font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--mid)">${a.currentCall ? a.currentCall.slice(0, 8) + '…' : '—'}</span></td>
+          <td style="font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--mid)">${new Date(a.joinedAt).toLocaleTimeString()}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderLiveCalls() {
+  const el = document.getElementById('live-calls-table');
+  const active = liveCalls.filter(c => c.status === 'active' || c.status === 'connecting');
+  if (!active.length) {
+    el.innerHTML = '<div class="empty-state"><div class="ei">📭</div>No active calls</div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Call ID</th><th>Customer</th><th>Type</th><th>Status</th><th>Started</th></tr></thead>
+    <tbody>
+      ${active.map(c => `
+        <tr>
+          <td><span style="font-family:'Space Mono',monospace;font-size:0.75rem">${c.id.slice(0, 8)}…</span></td>
+          <td><strong>${c.customerName}</strong></td>
+          <td><span class="badge ${c.type === 'voice' ? 'green' : 'purple'}">${c.type}</span></td>
+          <td><span class="badge ${c.status === 'active' ? 'green' : 'yellow'}">${c.status}</span></td>
+          <td style="font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--mid)">${c.startedAt ? new Date(c.startedAt).toLocaleTimeString() : '—'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderLiveQueue() {
+  const el = document.getElementById('live-queue-overview');
+  if (!liveQueue.length) {
+    el.innerHTML = '<div class="empty-state"><div class="ei">✅</div>No customers waiting</div>';
+    return;
+  }
+  el.innerHTML = liveQueue.map((item, i) => `
+    <div class="queue-item">
+      <div class="queue-pos">${i + 1}</div>
+      <div class="queue-info">
+        <div class="queue-name">${item.customerName}</div>
+        <div class="queue-meta">${item.type === 'voice' ? '📞 Voice' : '💬 Chat'}</div>
+      </div>
+      <div class="queue-wait">${formatWait(item.createdAt)}</div>
+    </div>
+  `).join('');
+}
+
+function statusBadge(status) {
+  const map = {
+    available: 'green',
+    busy: 'yellow',
+    'on-call': 'purple',
+    break: 'red',
+    offline: 'gray',
+  };
+  return `<span class="badge ${map[status] || 'gray'}">${status}</span>`;
+}
+
+function formatWait(createdAt) {
+  const secs = Math.floor((Date.now() - new Date(createdAt)) / 1000);
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function refreshStats() {
+  try {
+    const res = await fetch(`${API_URL}/api/supervisor/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+
+    document.getElementById('stat-total').textContent = data.totalCalls ?? '—';
+    document.getElementById('stat-today-calls').textContent = `${data.todayCalls ?? 0} today`;
+    document.getElementById('stat-queue').textContent = data.queueLength ?? 0;
+    document.getElementById('stat-agents-active').textContent = data.activeAgents ?? 0;
+    document.getElementById('stat-agents-busy').textContent = `${data.busyAgents ?? 0} on call`;
+
+    const avg = data.avgDuration || 0;
+    document.getElementById('stat-avg').textContent = `${Math.floor(avg / 60)}:${String(avg % 60).padStart(2, '0')}`;
+  } catch (e) {
+    console.warn('Stats fetch failed:', e);
+  }
+}
+
+// ── Bar Chart (mock hourly data) ───────────────────────────────────────────────
+function renderBarChart() {
+  const hours = ['6am','7','8','9','10','11','12','1pm','2','3','4','5'];
+  const data = hours.map(() => Math.floor(Math.random() * 90) + 10);
+  const max = Math.max(...data);
+  const el = document.getElementById('bar-chart');
+  el.innerHTML = hours.map((h, i) => `
+    <div class="bar" style="height:${(data[i]/max)*100}%" title="${data[i]} calls at ${h}">
+      <span>${h}</span>
+    </div>
+  `).join('');
+}
+
+// ── Agents ────────────────────────────────────────────────────────────────────
+async function loadAgents() {
+  try {
+    const res = await fetch(`${API_URL}/api/agents`, { headers: { Authorization: `Bearer ${token}` } });
+    const agents = await res.json();
+    const el = document.getElementById('agents-roster');
+    if (!agents.length) { el.innerHTML = '<div class="empty-state"><div class="ei">👥</div>No agents yet</div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+      <tbody>
+        ${agents.map(a => `
+          <tr>
+            <td><strong>${a.name}</strong></td>
+            <td style="font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--mid)">${a.email}</td>
+            <td><span class="badge green">Active</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+  } catch {}
+}
+
+async function addAgent() {
+  const name = document.getElementById('new-agent-name').value;
+  const email = document.getElementById('new-agent-email').value;
+  const password = document.getElementById('new-agent-pass').value;
+  const msgEl = document.getElementById('agent-form-msg');
+
+  if (!name || !email || !password) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'All fields are required'; return; }
+
+  try {
+    const res = await fetch(`${API_URL}/api/auth/agent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name, email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    msgEl.style.color = 'var(--green)';
+    msgEl.textContent = `✅ Agent "${name}" created successfully`;
+    document.getElementById('new-agent-name').value = '';
+    document.getElementById('new-agent-email').value = '';
+    document.getElementById('new-agent-pass').value = '';
+    loadAgents();
+    showToast(`Agent ${name} added!`);
+  } catch (err) {
+    msgEl.style.color = 'var(--red)';
+    msgEl.textContent = err.message;
+  }
+}
+
+// ── Documents ─────────────────────────────────────────────────────────────────
+async function loadDocuments() {
+  try {
+    const res = await fetch(`${API_URL}/api/documents`, { headers: { Authorization: `Bearer ${token}` } });
+    const docs = await res.json();
+    const el = document.getElementById('documents-list');
+    document.getElementById('doc-count').textContent = `${docs.length} document${docs.length !== 1 ? 's' : ''}`;
+
+    if (!docs.length) { el.innerHTML = '<div class="empty-state"><div class="ei">📄</div>No documents uploaded yet</div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th>Title</th><th>Type</th><th>Chunks</th><th>Added</th><th></th></tr></thead>
+      <tbody>
+        ${docs.map(d => `
+          <tr>
+            <td><strong>${d.title}</strong></td>
+            <td><span class="badge purple" style="font-size:0.65rem">${d.mimetype?.split('/').pop() || 'txt'}</span></td>
+            <td style="font-family:'Space Mono',monospace;font-size:0.78rem">${d.chunk_count || '—'}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--mid)">${new Date(d.created_at).toLocaleDateString()}</td>
+            <td><button onclick="deleteDoc('${d.id}', this)" style="background:var(--red-light);color:var(--red);border:none;padding:5px 12px;border-radius:6px;font-family:inherit;font-size:0.75rem;font-weight:600;cursor:pointer;">Delete</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+  } catch {}
+}
+
+async function uploadDoc(file) {
+  if (!file) return;
+  const title = document.getElementById('doc-title').value || file.name;
+  const progressEl = document.getElementById('upload-progress');
+  progressEl.textContent = '⏳ Uploading and processing…';
+
+  const formData = new FormData();
+  formData.append('document', file);
+  formData.append('title', title);
+
+  try {
+    const res = await fetch(`${API_URL}/api/documents`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    progressEl.style.color = 'var(--green)';
+    progressEl.textContent = `✅ "${title}" uploaded (${data.chunk_count} chunks indexed)`;
+    document.getElementById('doc-title').value = '';
+    loadDocuments();
+    showToast('Document added to knowledge base!');
+  } catch (err) {
+    progressEl.style.color = 'var(--red)';
+    progressEl.textContent = `❌ ${err.message}`;
+  }
+}
+
+async function deleteDoc(id, btn) {
+  if (!confirm('Remove this document from the knowledge base?')) return;
+  btn.disabled = true;
+  try {
+    await fetch(`${API_URL}/api/documents/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    loadDocuments();
+    showToast('Document removed');
+  } catch (err) {
+    btn.disabled = false;
+    alert(err.message);
+  }
+}
+
+function dragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag'); }
+function dragLeave() { document.getElementById('upload-zone').classList.remove('drag'); }
+function dropFile(e) {
+  e.preventDefault();
+  dragLeave();
+  const file = e.dataTransfer.files[0];
+  if (file) uploadDoc(file);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function showToast(message) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function startOverviewClock() {
+  const update = () => {
+    document.getElementById('overview-time').textContent = new Date().toLocaleString([], {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+  update();
+  setInterval(update, 30000);
+  setInterval(refreshStats, 15000);
+}
+</script>
+</body>
+</html>

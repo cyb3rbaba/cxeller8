@@ -1,7 +1,7 @@
 services:
   # ── Backend API + WebSocket server ──────────────────────────
   - type: web
-    name: nexus-callcenter-backend
+    name: cxeller8
     runtime: node
     region: oregon
     plan: free

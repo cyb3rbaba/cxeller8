@@ -8,6 +8,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('./utils/logger');
+const { addDocument } = require('./utils/rag');
+const { getDocuments } = require('./utils/database');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -403,11 +405,28 @@ app.use((err, req, res, next) => {
 });
 
 // ── Start server ──────────────────────────────────────────────────────────────
+// ── Load RAG documents from DB on startup ────────────────────────────────────
+async function loadRAGDocuments() {
+  try {
+    const docs = await getDocuments();
+    if (docs.length === 0) { logger.info('RAG: No documents in DB to load'); return; }
+    docs.forEach(doc => {
+      if (doc.content) {
+        addDocument(doc.title, doc.content, doc.id);
+      }
+    });
+    logger.info(`RAG: Loaded ${docs.length} documents from DB on startup`);
+  } catch (e) {
+    logger.warn('RAG: Could not load documents from DB:', e.message);
+  }
+}
+
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   logger.info(`🚀 CallCenter server running on port ${PORT}`);
   logger.info(`📡 WebRTC signaling active`);
   logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  await loadRAGDocuments();
 });
 
 module.exports = { app, server, io };

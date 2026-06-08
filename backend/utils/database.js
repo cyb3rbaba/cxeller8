@@ -123,10 +123,19 @@ async function uploadFile(bucket, path, buffer, contentType) {
   return urlData.publicUrl;
 }
 
+async function downloadFile(bucket, path) {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await db.storage.from(bucket).download(path);
+  if (error) throw error;
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 module.exports = {
   getSupabase,
   saveCall, updateCall, getCalls, getCallStats,
   saveAgent, getAgents,
   saveDocument, getDocuments, deleteDocument,
-  uploadFile,
+  uploadFile, downloadFile,
 };

@@ -88,6 +88,7 @@ router.post('/', authenticate, upload.single('document'), async (req, res) => {
       size: req.file.size,
       mimetype: req.file.mimetype,
       file_url: fileUrl,
+      content: content, // stored for RAG reload on restart
       chunk_count: Math.ceil(content.length / 500),
       created_at: new Date().toISOString(),
     };

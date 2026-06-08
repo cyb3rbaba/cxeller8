@@ -708,6 +708,81 @@ let callSeconds = 0, sessionSeconds = 0;
 let statsCallCount = 0, statsChatCount = 0, statsTotalDuration = 0;
 let mediaRecorder = null, recordedChunks = [];
 let queueTimers = {};
+let lastQueueSize = 0;
+let audioCtx = null;
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playNotificationSound(type) {
+  try {
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'voice') {
+      // Phone ring: two quick beeps
+      [0, 0.18].forEach(offset => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(880, now + offset);
+        osc.frequency.setValueAtTime(660, now + offset + 0.09);
+        gain.gain.setValueAtTime(0.4, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.18);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.18);
+      });
+    } else {
+      // Chat ping: soft ascending chime
+      [523, 659, 784].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.12);
+        gain.gain.setValueAtTime(0.3, now + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.25);
+        osc.start(now + i * 0.12);
+        osc.stop(now + i * 0.12 + 0.25);
+      });
+    }
+  } catch (e) { console.warn('Audio notification failed:', e); }
+}
+
+async function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+function showBrowserNotification(title, body, type) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const icon = type === 'voice' ? '📞' : '💬';
+  const n = new Notification(title, {
+    body,
+    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>' + icon + '</text></svg>',
+    badge: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>' + icon + '</text></svg>',
+    tag: 'nexus-queue',
+    renotify: true,
+    requireInteraction: false,
+  });
+  n.onclick = () => { window.focus(); n.close(); };
+  setTimeout(() => n.close(), 6000);
+}
+
+function notifyNewQueueItem(item) {
+  const isVoice = item.type === 'voice';
+  playNotificationSound(item.type);
+  showBrowserNotification(
+    isVoice ? '📞 Incoming Voice Call' : '💬 New Chat Request',
+    `${item.customerName || 'A customer'} is waiting`,
+    item.type
+  );
+}
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 async function login() {
@@ -745,6 +820,8 @@ document.getElementById('password').addEventListener('keydown', e => { if (e.key
 function initSocket() {
   socket = io(API_URL, { transports: ['websocket', 'polling'] });
 
+  requestNotificationPermission();
+  initAudio();
   socket.on('connect', () => {
     socket.emit('register:agent', { agentId: agentInfo.id, name: agentInfo.name });
   });
@@ -810,6 +887,13 @@ function renderQueue(queue) {
   const list = document.getElementById('queue-list');
   const badge = document.getElementById('queue-badge');
   badge.textContent = queue.length;
+
+  // Notify for each new item that wasn't in the queue before
+  if (queue.length > lastQueueSize) {
+    const newItems = queue.slice(-(queue.length - lastQueueSize));
+    newItems.forEach(item => notifyNewQueueItem(item));
+  }
+  lastQueueSize = queue.length;
 
   if (queue.length === 0) {
     list.innerHTML = '<div class="no-items"><div class="no-icon">📭</div>Queue is empty</div>';
